@@ -381,6 +381,12 @@
     margin-top: 4px;
   }
 
+  .pesca-card .onda-media {
+    font-size: 14px;
+    font-weight: 800;
+    margin-top: 4px;
+  }
+
   .pesca-card.boa {
     background: linear-gradient(150deg, #0e7c3f, #34c974);
   }
@@ -452,6 +458,7 @@ const LUGARES = [
   { nome: "Represa das Palmeiras", lat: -26.6010169, lon: -49.3383111 },
   { nome: "Represa da Volta Grande", lat: -26.5756963, lon: -49.6210056 },
   { nome: "Represa do Pinhal", lat: -26.6184874, lon: -49.4088677 },
+  { nome: "Ilhas do Itacolomi", lat: -26.7106766, lon: -48.6179942 },
 ];
 
 const DIAS_PREVISAO = 7; // hoje + 6 dias
@@ -688,7 +695,29 @@ function classificarPesca(mediaVelocidade) {
   return { classe: "ruim", icone: "🚫", texto: "Não pescável" };
 }
 
-function calcularPeriodoPesca(dadosVento, dataAlvo, horaInicio, horaFim) {
+function ondaMediaNoPeriodo(dadosOndas, dataAlvo, horaInicio, horaFim) {
+  if (!dadosOndas || !dadosOndas.hourly) return null;
+
+  const { time, wave_height } = dadosOndas.hourly;
+  const alturas = [];
+
+  for (let i = 0; i < time.length; i++) {
+    const [data, horaTexto] = time[i].split("T");
+    if (data !== dataAlvo) continue;
+
+    const hora = Number(horaTexto.slice(0, 2));
+    if (hora < horaInicio || hora > horaFim) continue;
+
+    if (wave_height[i] !== null && wave_height[i] !== undefined) {
+      alturas.push(wave_height[i]);
+    }
+  }
+
+  if (alturas.length === 0) return null;
+  return alturas.reduce((soma, v) => soma + v, 0) / alturas.length;
+}
+
+function calcularPeriodoPesca(dadosVento, dadosOndas, dataAlvo, horaInicio, horaFim) {
   const resumo = resumoPeriodo(dadosVento, dataAlvo, horaInicio, horaFim);
 
   return {
@@ -696,11 +725,16 @@ function calcularPeriodoPesca(dadosVento, dataAlvo, horaInicio, horaFim) {
     media: resumo.ventoMedio,
     temperaturaMedia: resumo.temperaturaMedia,
     clima: resumo.clima,
+    ondaMedia: ondaMediaNoPeriodo(dadosOndas, dataAlvo, horaInicio, horaFim),
     ...classificarPesca(resumo.ventoMedio),
   };
 }
 
 function htmlCardPesca(rotulo, periodo) {
+  const ondaHtml = periodo.ondaMedia !== null
+    ? `<div class="onda-media">🌊 Onda média: ${periodo.ondaMedia.toFixed(1)} m</div>`
+    : "";
+
   const temperaturaHtml = periodo.temperaturaMedia !== null
     ? `<div class="temp-media">${Math.round(periodo.temperaturaMedia)}°C</div>`
     : "";
@@ -718,6 +752,7 @@ function htmlCardPesca(rotulo, periodo) {
       <div class="periodo">${rotulo}</div>
       <div class="icone">${periodo.icone}</div>
       <div class="status">${periodo.texto}</div>
+      ${ondaHtml}
       ${temperaturaHtml}
       ${climaHtml}
       ${ventoHtml}
@@ -867,8 +902,8 @@ function selecionarHora(indiceLugar, indiceHora) {
   }
 
   const dataSelecionada = estado.linhas[indiceHora].hora.slice(0, 10);
-  estado.periodoManha = calcularPeriodoPesca(estado.dadosVentoCompleto, dataSelecionada, 6, 12);
-  estado.periodoTarde = calcularPeriodoPesca(estado.dadosVentoCompleto, dataSelecionada, 13, 18);
+  estado.periodoManha = calcularPeriodoPesca(estado.dadosVentoCompleto, estado.dadosOndasCompleto, dataSelecionada, 6, 12);
+  estado.periodoTarde = calcularPeriodoPesca(estado.dadosVentoCompleto, estado.dadosOndasCompleto, dataSelecionada, 13, 18);
 
   const tituloPesca = elemento.querySelector(".pesca-titulo");
   if (tituloPesca) {
@@ -902,14 +937,16 @@ async function carregarLugar(indiceLugar) {
     }
 
     const dataInicial = linhas[0].hora.slice(0, 10);
+    const dadosOndasCompleto = ehMar ? dadosOndas : null;
 
     ESTADO[indiceLugar] = {
       linhas,
       dadosVentoCompleto: dadosVento,
+      dadosOndasCompleto,
       ehMar,
       selecionado: 0,
-      periodoManha: calcularPeriodoPesca(dadosVento, dataInicial, 6, 12),
-      periodoTarde: calcularPeriodoPesca(dadosVento, dataInicial, 13, 18),
+      periodoManha: calcularPeriodoPesca(dadosVento, dadosOndasCompleto, dataInicial, 6, 12),
+      periodoTarde: calcularPeriodoPesca(dadosVento, dadosOndasCompleto, dataInicial, 13, 18),
       atualizadoEm: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     };
 
