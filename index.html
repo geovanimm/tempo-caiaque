@@ -280,12 +280,6 @@
     opacity: .9;
   }
 
-  .pesca-card .data {
-    font-size: 11px;
-    opacity: .8;
-    margin-top: 2px;
-  }
-
   .pesca-card .icone {
     font-size: 30px;
     margin: 8px 0 4px;
@@ -650,7 +644,6 @@ function htmlCardPesca(rotulo, periodo) {
   return `
     <div class="pesca-card ${periodo.classe}">
       <div class="periodo">${rotulo}</div>
-      <div class="data">${formatarDia(`${periodo.data}T00:00`)}</div>
       <div class="icone">${periodo.icone}</div>
       <div class="status">${periodo.texto}</div>
       ${temperaturaHtml}
@@ -663,15 +656,23 @@ function htmlCardPesca(rotulo, periodo) {
 function htmlGradePesca(periodoManha, periodoTarde) {
   return `
     <div class="pesca">
-      ${htmlCardPesca("Manhã · 6h–12h", periodoManha)}
-      ${htmlCardPesca("Tarde · 13h–18h", periodoTarde)}
+      ${htmlCardPesca("Manhã", periodoManha)}
+      ${htmlCardPesca("Tarde", periodoTarde)}
     </div>
   `;
 }
 
+function htmlTituloPescabilidade(periodo) {
+  const dataTexto = periodo && periodo.data
+    ? ` · ${formatarDia(`${periodo.data}T00:00`)}`
+    : "";
+
+  return `<div class="pesca-titulo">🎣 Pescabilidade${dataTexto}</div>`;
+}
+
 function htmlPescabilidade(periodoManha, periodoTarde) {
   return `
-    <div class="pesca-titulo">🎣 Pescabilidade</div>
+    ${htmlTituloPescabilidade(periodoManha)}
     ${htmlGradePesca(periodoManha, periodoTarde)}
   `;
 }
@@ -796,6 +797,11 @@ function selecionarHora(indiceLugar, indiceHora) {
   const dataSelecionada = estado.linhas[indiceHora].hora.slice(0, 10);
   estado.periodoManha = calcularPeriodoPesca(estado.dadosVentoCompleto, dataSelecionada, 6, 12);
   estado.periodoTarde = calcularPeriodoPesca(estado.dadosVentoCompleto, dataSelecionada, 13, 18);
+
+  const tituloPesca = elemento.querySelector(".pesca-titulo");
+  if (tituloPesca) {
+    tituloPesca.outerHTML = htmlTituloPescabilidade(estado.periodoManha);
+  }
 
   const blocoPesca = elemento.querySelector(".pesca");
   if (blocoPesca) {
