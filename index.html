@@ -95,13 +95,18 @@
 
   .hora {
     flex: 0 0 auto;
-    width: 72px;
+    width: 104px;
     text-align: center;
     background: #fafbfc;
     border: 1px solid #eee;
     border-radius: 10px;
-    padding: 8px 4px;
+    padding: 10px 6px;
     font-size: 12px;
+    cursor: pointer;
+  }
+
+  .hora:hover {
+    border-color: #0b3d5c;
   }
 
   .hora.atual {
@@ -110,24 +115,52 @@
     border-color: #0b3d5c;
   }
 
+  .hora .dia {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    opacity: .75;
+    margin-bottom: 2px;
+  }
+
   .hora .h {
     font-weight: bold;
-    margin-bottom: 4px;
+    font-size: 14px;
+    margin-bottom: 6px;
   }
 
   .hora .seta {
-    font-size: 18px;
+    font-size: 16px;
+    vertical-align: middle;
   }
 
-  .hora .vel {
-    margin-top: 4px;
+  .hora .clima-icone {
+    font-size: 20px;
+  }
+
+  .hora .temp {
+    font-weight: bold;
+    margin: 2px 0 8px;
+  }
+
+  .hora .vento-linha {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     font-weight: bold;
   }
 
-  .hora .onda-mini {
-    margin-top: 4px;
+  .hora .rajada-mini {
+    margin-top: 3px;
     font-size: 11px;
-    opacity: .85;
+    opacity: .8;
+  }
+
+  .hora .onda-mini {
+    margin-top: 6px;
+    font-size: 11px;
+    opacity: .9;
   }
 
   .carregando, .erro {
@@ -221,6 +254,19 @@ function formatarHora(isoLocal) {
   return isoLocal.slice(11, 16);
 }
 
+function formatarDia(isoLocal) {
+  const dataLinha = isoLocal.slice(0, 10); // "AAAA-MM-DD"
+
+  const hoje = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const dataHoje = `${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}`;
+
+  if (dataLinha === dataHoje) return "Hoje";
+
+  const [, mes, dia] = dataLinha.split("-");
+  return `${dia}/${mes}`;
+}
+
 function horaAtualISO() {
   const agora = new Date();
   agora.setMinutes(0, 0, 0);
@@ -275,7 +321,6 @@ function montarLinhasHorarias(dadosVento, dadosOndas) {
   for (let i = indiceAgora; i < fim; i++) {
     linhas.push({
       hora: horas[i],
-      atual: i === indiceAgora,
       velocidade: dadosVento.hourly.wind_speed_10m[i],
       direcao: dadosVento.hourly.wind_direction_10m[i],
       rajada: dadosVento.hourly.wind_gusts_10m[i],
@@ -325,18 +370,22 @@ function htmlAgora(linha, ehMar) {
   return `<div class="agora">${blocos}</div>`;
 }
 
-function htmlHoras(linhas, ehMar) {
-  const cartoes = linhas.map(linha => {
+function htmlHoras(linhas, ehMar, selecionado) {
+  const cartoes = linhas.map((linha, indice) => {
     const seta = `<span class="seta" style="transform: rotate(${linha.direcao + 180}deg)">↑</span>`;
+    const clima = infoClima(linha.codigoClima);
     const onda = (ehMar && linha.ondaAltura !== null)
       ? `<div class="onda-mini">🌊 ${linha.ondaAltura.toFixed(1)}m</div>`
       : "";
 
     return `
-      <div class="hora ${linha.atual ? "atual" : ""}">
+      <div class="hora ${indice === selecionado ? "atual" : ""}" data-indice="${indice}">
+        <div class="dia">${formatarDia(linha.hora)}</div>
         <div class="h">${formatarHora(linha.hora)}</div>
-        ${seta}
-        <div class="vel">${Math.round(linha.velocidade)}</div>
+        <div class="clima-icone">${clima.icone}</div>
+        <div class="temp">${Math.round(linha.temperatura)}°C</div>
+        <div class="vento-linha">${seta} ${Math.round(linha.velocidade)} km/h</div>
+        <div class="rajada-mini">Rajada ${Math.round(linha.rajada)} km/h</div>
         ${onda}
       </div>
     `;
@@ -345,7 +394,38 @@ function htmlHoras(linhas, ehMar) {
   return `<div class="horas">${cartoes}</div>`;
 }
 
-async function carregarLugar(lugar, elemento) {
+// Estado por lugar (mesmo índice de LUGARES): dados já buscados + qual
+// hora está selecionada no momento. Clicar num card de hora só troca a
+// seleção e redesenha — não busca dados de novo na API.
+const ESTADO = [];
+
+function renderizarLugar(indiceLugar) {
+  const lugar = LUGARES[indiceLugar];
+  const estado = ESTADO[indiceLugar];
+  const elemento = document.getElementById(`lugar-${indiceLugar}`);
+  if (!estado || !elemento) return;
+
+  const linhaSelecionada = estado.linhas[estado.selecionado];
+
+  elemento.innerHTML = `
+    <h2>${lugar.nome}</h2>
+    ${htmlAgora(linhaSelecionada, estado.ehMar)}
+    ${htmlHoras(estado.linhas, estado.ehMar, estado.selecionado)}
+    <div class="atualizado">Atualizado às ${estado.atualizadoEm}</div>
+  `;
+
+  elemento.querySelectorAll(".hora").forEach(cartaoHora => {
+    cartaoHora.addEventListener("click", () => {
+      estado.selecionado = Number(cartaoHora.dataset.indice);
+      renderizarLugar(indiceLugar);
+    });
+  });
+}
+
+async function carregarLugar(indiceLugar) {
+  const lugar = LUGARES[indiceLugar];
+  const elemento = document.getElementById(`lugar-${indiceLugar}`);
+
   try {
     const [dadosVento, dadosOndas] = await Promise.all([
       buscarVento(lugar.lat, lugar.lon),
@@ -359,14 +439,14 @@ async function carregarLugar(lugar, elemento) {
       throw new Error("Sem dados horários disponíveis");
     }
 
-    const agora = linhas[0];
+    ESTADO[indiceLugar] = {
+      linhas,
+      ehMar,
+      selecionado: 0,
+      atualizadoEm: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    };
 
-    elemento.innerHTML = `
-      <h2>${lugar.nome}</h2>
-      ${htmlAgora(agora, ehMar)}
-      ${htmlHoras(linhas, ehMar)}
-      <div class="atualizado">Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
-    `;
+    renderizarLugar(indiceLugar);
   } catch (erro) {
     elemento.innerHTML = `
       <h2>${lugar.nome}</h2>
@@ -376,17 +456,13 @@ async function carregarLugar(lugar, elemento) {
 }
 
 function carregarTudo() {
-  LUGARES.forEach(lugar => {
-    let elemento = document.getElementById(`lugar-${lugar.nome}`);
-    if (!elemento) return;
-    carregarLugar(lugar, elemento);
-  });
+  LUGARES.forEach((lugar, indice) => carregarLugar(indice));
 }
 
 function montarPagina() {
   const lista = document.getElementById("lista");
-  lista.innerHTML = LUGARES.map(lugar => `
-    <div class="lugar" id="lugar-${lugar.nome}">
+  lista.innerHTML = LUGARES.map((lugar, indice) => `
+    <div class="lugar" id="lugar-${indice}">
       <div class="carregando">Carregando ${lugar.nome}...</div>
     </div>
   `).join("");
