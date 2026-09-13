@@ -20,12 +20,99 @@
   header {
     background: #0b3d5c;
     color: white;
-    padding: 22px;
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }
 
   header h1 {
-    margin: 0 0 6px;
+    margin: 0;
     font-size: 24px;
+  }
+
+  .botao-menu {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 22px;
+    line-height: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .botao-menu:hover {
+    background: rgba(255, 255, 255, .12);
+  }
+
+  .overlay-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    z-index: 30;
+  }
+
+  .overlay-menu.aberto {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .menu-locais {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    max-width: 78vw;
+    background: white;
+    box-shadow: 2px 0 16px rgba(0, 0, 0, .18);
+    transform: translateX(-100%);
+    transition: transform .25s;
+    z-index: 31;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .menu-locais.aberto {
+    transform: translateX(0);
+  }
+
+  .menu-locais-titulo {
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #666;
+    margin-bottom: 12px;
+  }
+
+  .local-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 12px 10px;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    color: #222;
+    cursor: pointer;
+  }
+
+  .local-item:hover {
+    background: #f0f2f4;
+  }
+
+  .local-item.ativo {
+    background: #0b3d5c;
+    color: white;
+    font-weight: bold;
   }
 
   .container {
@@ -275,10 +362,19 @@
 <body>
 
 <header>
+  <button id="botaoMenu" class="botao-menu" aria-label="Mudar de local">☰</button>
   <h1>🌬️ Tempo Pesca de Caiaque</h1>
 </header>
 
-<div class="container" id="lista">
+<div id="overlayMenu" class="overlay-menu"></div>
+
+<nav id="menuLocais" class="menu-locais">
+  <div class="menu-locais-titulo">Locais</div>
+  <div id="listaLocais"></div>
+</nav>
+
+<div class="container">
+  <div class="lugar" id="conteudoLugar"></div>
 </div>
 
 <script>
@@ -289,6 +385,7 @@
 // ============================================================
 const LUGARES = [
   { nome: "Represa das Palmeiras", lat: -26.6010169, lon: -49.3383111 },
+  { nome: "Represa da Volta Grande", lat: -26.5756963, lon: -49.6210056 },
 ];
 
 const DIAS_PREVISAO = 7; // hoje + 6 dias
@@ -608,10 +705,57 @@ function htmlHoras(linhas, ehMar, selecionado) {
 // seleção e redesenha — não busca dados de novo na API.
 const ESTADO = [];
 
+// Todos os lugares são buscados em segundo plano (ver carregarTudo), mas
+// só o lugar "ativo" é desenhado na tela — trocar pelo menu lateral é
+// instantâneo quando os dados já foram carregados.
+let ativo = 0;
+
+function montarMenuLocais() {
+  const lista = document.getElementById("listaLocais");
+  lista.innerHTML = LUGARES.map((lugar, indice) => `
+    <button class="local-item ${indice === ativo ? "ativo" : ""}" data-indice="${indice}">
+      ${lugar.nome}
+    </button>
+  `).join("");
+
+  lista.querySelectorAll(".local-item").forEach(botao => {
+    botao.addEventListener("click", () => {
+      mudarLugarAtivo(Number(botao.dataset.indice));
+      fecharMenu();
+    });
+  });
+}
+
+function abrirMenu() {
+  document.getElementById("menuLocais").classList.add("aberto");
+  document.getElementById("overlayMenu").classList.add("aberto");
+}
+
+function fecharMenu() {
+  document.getElementById("menuLocais").classList.remove("aberto");
+  document.getElementById("overlayMenu").classList.remove("aberto");
+}
+
+function mudarLugarAtivo(indice) {
+  if (indice === ativo) return;
+
+  ativo = indice;
+  montarMenuLocais();
+
+  if (ESTADO[indice]) {
+    renderizarLugar(indice);
+  } else {
+    document.getElementById("conteudoLugar").innerHTML =
+      `<div class="carregando">Carregando ${LUGARES[indice].nome}...</div>`;
+  }
+}
+
 function renderizarLugar(indiceLugar) {
+  if (indiceLugar !== ativo) return;
+
   const lugar = LUGARES[indiceLugar];
   const estado = ESTADO[indiceLugar];
-  const elemento = document.getElementById(`lugar-${indiceLugar}`);
+  const elemento = document.getElementById("conteudoLugar");
   if (!estado || !elemento) return;
 
   const linhaSelecionada = estado.linhas[estado.selecionado];
@@ -636,8 +780,10 @@ function renderizarLugar(indiceLugar) {
 // marcação do card selecionado — sem redesenhar a faixa de horas, pra
 // não perder a posição de rolagem que o usuário já tinha feito.
 function selecionarHora(indiceLugar, indiceHora) {
+  if (indiceLugar !== ativo) return;
+
   const estado = ESTADO[indiceLugar];
-  const elemento = document.getElementById(`lugar-${indiceLugar}`);
+  const elemento = document.getElementById("conteudoLugar");
   if (!estado || !elemento) return;
 
   estado.selecionado = indiceHora;
@@ -663,7 +809,6 @@ function selecionarHora(indiceLugar, indiceHora) {
 
 async function carregarLugar(indiceLugar) {
   const lugar = LUGARES[indiceLugar];
-  const elemento = document.getElementById(`lugar-${indiceLugar}`);
 
   try {
     const [dadosVento, dadosOndas] = await Promise.all([
@@ -692,7 +837,9 @@ async function carregarLugar(indiceLugar) {
 
     renderizarLugar(indiceLugar);
   } catch (erro) {
-    elemento.innerHTML = `
+    if (indiceLugar !== ativo) return;
+
+    document.getElementById("conteudoLugar").innerHTML = `
       <h2>${lugar.nome}</h2>
       <div class="erro">❌ Erro ao carregar previsão: ${erro.message}</div>
     `;
@@ -704,12 +851,12 @@ function carregarTudo() {
 }
 
 function montarPagina() {
-  const lista = document.getElementById("lista");
-  lista.innerHTML = LUGARES.map((lugar, indice) => `
-    <div class="lugar" id="lugar-${indice}">
-      <div class="carregando">Carregando ${lugar.nome}...</div>
-    </div>
-  `).join("");
+  montarMenuLocais();
+  document.getElementById("conteudoLugar").innerHTML =
+    `<div class="carregando">Carregando ${LUGARES[ativo].nome}...</div>`;
+
+  document.getElementById("botaoMenu").addEventListener("click", abrirMenu);
+  document.getElementById("overlayMenu").addEventListener("click", fecharMenu);
 }
 
 montarPagina();

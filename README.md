@@ -15,7 +15,7 @@ Edite o array `LUGARES` no `<script>` do `index.html`:
 ```js
 const LUGARES = [
   { nome: "Represa das Palmeiras", lat: -26.6010169, lon: -49.3383111 },
-  { nome: "Outro lugar", lat: -26.7889, lon: -48.6392 },
+  { nome: "Represa da Volta Grande", lat: -26.5756963, lon: -49.6210056 },
 ];
 ```
 
@@ -23,6 +23,11 @@ Não é preciso marcar se o lugar é mar ou não — o app tenta buscar dados
 de ondas (API marítima da Open-Meteo) e só exibe esse bloco quando a
 API retorna dados válidos para aquele ponto. Pontos em terra/represas
 simplesmente não mostram ondas.
+
+Todo lugar da lista aparece no menu lateral (ícone ☰ no cabeçalho) para
+trocar entre eles. Os dados de todos os lugares são buscados em segundo
+plano a cada atualização, então trocar de lugar no menu é instantâneo
+quando os dados já foram carregados.
 
 ## Como funciona
 
