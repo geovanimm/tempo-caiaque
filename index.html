@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tempo Caiaque</title>
+
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5f6f8;
+    color: #222;
+  }
+
+  header {
+    background: #0b3d5c;
+    color: white;
+    padding: 22px;
+  }
+
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 24px;
+  }
+
+  header p {
+    margin: 0;
+    opacity: 0.8;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+  }
+
+  .lugar {
+    background: white;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 20px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+  }
+
+  .lugar h2 {
+    margin: 0 0 4px;
+    font-size: 19px;
+  }
+
+  .lugar .coords {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 14px;
+  }
+
+  .agora {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: #eef4f8;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .agora .bloco {
+    text-align: center;
+    min-width: 90px;
+  }
+
+  .agora .bloco .rotulo {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .agora .bloco .valor {
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 2px;
+  }
+
+  .seta {
+    display: inline-block;
+    font-size: 26px;
+    transition: transform .3s;
+  }
+
+  .onda .seta {
+    color: #0b3d5c;
+  }
+
+  .horas {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+
+  .hora {
+    flex: 0 0 auto;
+    width: 72px;
+    text-align: center;
+    background: #fafbfc;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+
+  .hora.atual {
+    background: #0b3d5c;
+    color: white;
+    border-color: #0b3d5c;
+  }
+
+  .hora .h {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+
+  .hora .seta {
+    font-size: 18px;
+  }
+
+  .hora .vel {
+    margin-top: 4px;
+    font-weight: bold;
+  }
+
+  .hora .onda-mini {
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: .85;
+  }
+
+  .carregando, .erro {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+  }
+
+  .erro {
+    color: #b00020;
+  }
+
+  .atualizado {
+    font-size: 11px;
+    color: #999;
+    text-align: right;
+    margin-top: 10px;
+  }
+
+  @media (max-width: 600px) {
+    .container {
+      padding: 12px;
+    }
+    .agora {
+      gap: 14px;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🌬️ Tempo Caiaque</h1>
+  <p>Vento, direção e ondas (quando o ponto é no mar), hora a hora</p>
+</header>
+
+<div class="container" id="lista">
+</div>
+
+<script>
+
+// ============================================================
+// LUGARES — edite esta lista para adicionar/remover pontos.
+// nome: texto exibido | lat/lon: coordenadas decimais
+// ============================================================
+const LUGARES = [
+  { nome: "Represa das Palmeiras", lat: -26.6010169, lon: -49.3383111 },
+];
+
+const HORAS_EXIBIDAS = 24;
+const ATUALIZA_A_CADA_MS = 15 * 60 * 1000; // 15 min
+
+const CARDINAIS = [
+  "N", "NNE", "NE", "ENE", "L", "ESE", "SE", "SSE",
+  "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"
+];
+
+function grausParaCardinal(graus) {
+  const indice = Math.round(graus / 22.5) % 16;
+  return CARDINAIS[indice];
+}
+
+function formatarHora(isoLocal) {
+  // Open-Meteo com timezone=auto retorna "AAAA-MM-DDTHH:MM" já em hora local
+  return isoLocal.slice(11, 16);
+}
+
+function horaAtualISO() {
+  const agora = new Date();
+  agora.setMinutes(0, 0, 0);
+  const pad = n => String(n).padStart(2, "0");
+  return `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:00`;
+}
+
+async function buscarJSON(url) {
+  const resposta = await fetch(url);
+  if (!resposta.ok) {
+    throw new Error(`HTTP ${resposta.status}`);
+  }
+  return resposta.json();
+}
+
+async function buscarVento(lat, lon) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${lat}&longitude=${lon}` +
+    `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+    `&wind_speed_unit=kmh&timezone=auto&forecast_days=2`;
+
+  return buscarJSON(url);
+}
+
+async function buscarOndas(lat, lon) {
+  const url =
+    `https://marine-api.open-meteo.com/v1/marine` +
+    `?latitude=${lat}&longitude=${lon}` +
+    `&hourly=wave_height,wave_direction,wave_period` +
+    `&timezone=auto&forecast_days=2`;
+
+  try {
+    return await buscarJSON(url);
+  } catch (erro) {
+    return null;
+  }
+}
+
+function temDadosDeOnda(dadosOndas) {
+  if (!dadosOndas || !dadosOndas.hourly) return false;
+  const alturas = dadosOndas.hourly.wave_height || [];
+  return alturas.some(v => v !== null && v !== undefined);
+}
+
+function montarLinhasHorarias(dadosVento, dadosOndas) {
+  const horas = dadosVento.hourly.time;
+  const indiceAgora = Math.max(0, horas.indexOf(horaAtualISO()));
+  const fim = Math.min(horas.length, indiceAgora + HORAS_EXIBIDAS);
+
+  const linhas = [];
+  for (let i = indiceAgora; i < fim; i++) {
+    linhas.push({
+      hora: horas[i],
+      atual: i === indiceAgora,
+      velocidade: dadosVento.hourly.wind_speed_10m[i],
+      direcao: dadosVento.hourly.wind_direction_10m[i],
+      rajada: dadosVento.hourly.wind_gusts_10m[i],
+      ondaAltura: dadosOndas ? dadosOndas.hourly.wave_height[i] : null,
+      ondaDirecao: dadosOndas ? dadosOndas.hourly.wave_direction[i] : null,
+      ondaPeriodo: dadosOndas ? dadosOndas.hourly.wave_period[i] : null,
+    });
+  }
+  return linhas;
+}
+
+function htmlAgora(linha, ehMar) {
+  const setaVento = `<span class="seta" style="transform: rotate(${linha.direcao + 180}deg)">↑</span>`;
+
+  let blocos = `
+    <div class="bloco">
+      <div class="rotulo">Vento</div>
+      <div class="valor">${setaVento} ${Math.round(linha.velocidade)} km/h</div>
+    </div>
+    <div class="bloco">
+      <div class="rotulo">Direção</div>
+      <div class="valor">${grausParaCardinal(linha.direcao)} (${Math.round(linha.direcao)}°)</div>
+    </div>
+    <div class="bloco">
+      <div class="rotulo">Rajadas</div>
+      <div class="valor">${Math.round(linha.rajada)} km/h</div>
+    </div>
+  `;
+
+  if (ehMar && linha.ondaAltura !== null) {
+    const setaOnda = `<span class="seta onda" style="transform: rotate(${linha.ondaDirecao + 180}deg)">↑</span>`;
+    blocos += `
+      <div class="bloco">
+        <div class="rotulo">Ondas</div>
+        <div class="valor">${setaOnda} ${linha.ondaAltura.toFixed(1)} m</div>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Período</div>
+        <div class="valor">${Math.round(linha.ondaPeriodo)} s</div>
+      </div>
+    `;
+  }
+
+  return `<div class="agora">${blocos}</div>`;
+}
+
+function htmlHoras(linhas, ehMar) {
+  const cartoes = linhas.map(linha => {
+    const seta = `<span class="seta" style="transform: rotate(${linha.direcao + 180}deg)">↑</span>`;
+    const onda = (ehMar && linha.ondaAltura !== null)
+      ? `<div class="onda-mini">🌊 ${linha.ondaAltura.toFixed(1)}m</div>`
+      : "";
+
+    return `
+      <div class="hora ${linha.atual ? "atual" : ""}">
+        <div class="h">${formatarHora(linha.hora)}</div>
+        ${seta}
+        <div class="vel">${Math.round(linha.velocidade)}</div>
+        ${onda}
+      </div>
+    `;
+  }).join("");
+
+  return `<div class="horas">${cartoes}</div>`;
+}
+
+async function carregarLugar(lugar, elemento) {
+  try {
+    const [dadosVento, dadosOndas] = await Promise.all([
+      buscarVento(lugar.lat, lugar.lon),
+      buscarOndas(lugar.lat, lugar.lon),
+    ]);
+
+    const ehMar = temDadosDeOnda(dadosOndas);
+    const linhas = montarLinhasHorarias(dadosVento, ehMar ? dadosOndas : null);
+
+    if (linhas.length === 0) {
+      throw new Error("Sem dados horários disponíveis");
+    }
+
+    const agora = linhas[0];
+
+    elemento.innerHTML = `
+      <h2>${lugar.nome}</h2>
+      <div class="coords">${lugar.lat.toFixed(4)}, ${lugar.lon.toFixed(4)} — ${ehMar ? "mar/costa" : "sem previsão de ondas"}</div>
+      ${htmlAgora(agora, ehMar)}
+      ${htmlHoras(linhas, ehMar)}
+      <div class="atualizado">Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
+    `;
+  } catch (erro) {
+    elemento.innerHTML = `
+      <h2>${lugar.nome}</h2>
+      <div class="erro">❌ Erro ao carregar previsão: ${erro.message}</div>
+    `;
+  }
+}
+
+function carregarTudo() {
+  LUGARES.forEach(lugar => {
+    let elemento = document.getElementById(`lugar-${lugar.nome}`);
+    if (!elemento) return;
+    carregarLugar(lugar, elemento);
+  });
+}
+
+function montarPagina() {
+  const lista = document.getElementById("lista");
+  lista.innerHTML = LUGARES.map(lugar => `
+    <div class="lugar" id="lugar-${lugar.nome}">
+      <div class="carregando">Carregando ${lugar.nome}...</div>
+    </div>
+  `).join("");
+}
+
+montarPagina();
+carregarTudo();
+setInterval(carregarTudo, ATUALIZA_A_CADA_MS);
+
+</script>
+
+</body>
+</html>
