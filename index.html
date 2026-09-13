@@ -281,6 +281,11 @@ const LUGARES = [
 const HORAS_EXIBIDAS = 24;
 const ATUALIZA_A_CADA_MS = 15 * 60 * 1000; // 15 min
 
+// Pescador de caiaque não pesca de noite — a faixa de horários só
+// mostra das 6h às 18h, pulando direto pro próximo dia às 19h.
+const HORA_INICIO_PESCA = 6;
+const HORA_FIM_PESCA = 18;
+
 // Códigos de tempo (WMO) usados pela Open-Meteo — https://open-meteo.com/en/docs
 const CLIMA = {
   0: { icone: "☀️", texto: "Céu limpo" },
@@ -380,13 +385,20 @@ function temDadosDeOnda(dadosOndas) {
   return alturas.some(v => v !== null && v !== undefined);
 }
 
+function dentroDoHorarioDePesca(isoLocal) {
+  const hora = Number(isoLocal.slice(11, 13));
+  return hora >= HORA_INICIO_PESCA && hora <= HORA_FIM_PESCA;
+}
+
 function montarLinhasHorarias(dadosVento, dadosOndas) {
   const horas = dadosVento.hourly.time;
-  const indiceAgora = Math.max(0, horas.indexOf(horaAtualISO()));
-  const fim = Math.min(horas.length, indiceAgora + HORAS_EXIBIDAS);
+  const agora = horaAtualISO();
 
   const linhas = [];
-  for (let i = indiceAgora; i < fim; i++) {
+  for (let i = 0; i < horas.length && linhas.length < HORAS_EXIBIDAS; i++) {
+    if (horas[i] < agora) continue;
+    if (!dentroDoHorarioDePesca(horas[i])) continue;
+
     linhas.push({
       hora: horas[i],
       velocidade: dadosVento.hourly.wind_speed_10m[i],
