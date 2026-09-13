@@ -163,6 +163,80 @@
     opacity: .9;
   }
 
+  .pesca-titulo {
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #666;
+    margin: 20px 0 10px;
+  }
+
+  .pesca {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  @media (min-width: 600px) {
+    .pesca {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .pesca-card {
+    border-radius: 16px;
+    padding: 22px 18px;
+    color: white;
+    text-align: center;
+  }
+
+  .pesca-card .periodo {
+    font-size: 13px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    opacity: .9;
+  }
+
+  .pesca-card .data {
+    font-size: 12px;
+    opacity: .8;
+    margin-top: 2px;
+  }
+
+  .pesca-card .icone {
+    font-size: 44px;
+    margin: 14px 0 6px;
+  }
+
+  .pesca-card .status {
+    font-size: 19px;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .pesca-card .vento-medio {
+    font-size: 13px;
+    opacity: .9;
+  }
+
+  .pesca-card.boa {
+    background: linear-gradient(135deg, #0e7c3f, #2ecc71);
+  }
+
+  .pesca-card.media {
+    background: linear-gradient(135deg, #a8710f, #f2b705);
+  }
+
+  .pesca-card.ruim {
+    background: linear-gradient(135deg, #7c1414, #e74c3c);
+  }
+
+  .pesca-card.indisponivel {
+    background: #888;
+  }
+
   .carregando, .erro {
     text-align: center;
     padding: 20px;
@@ -370,6 +444,88 @@ function htmlAgora(linha, ehMar) {
   return `<div class="agora">${blocos}</div>`;
 }
 
+// ============================================================
+// PESCABILIDADE — vento médio da manhã (6h-12h) e da tarde (13h-18h).
+// Usa o dia atual enquanto a janela ainda não terminou; depois que
+// termina, passa a mostrar a mesma janela do dia seguinte.
+// ============================================================
+
+function dataDoPeriodo(horaFim) {
+  const agora = new Date();
+  const pad = n => String(n).padStart(2, "0");
+
+  const dataBase = new Date(agora);
+  if (agora.getHours() > horaFim) {
+    dataBase.setDate(dataBase.getDate() + 1);
+  }
+
+  return `${dataBase.getFullYear()}-${pad(dataBase.getMonth() + 1)}-${pad(dataBase.getDate())}`;
+}
+
+function ventoMedioNoPeriodo(dadosVento, dataAlvo, horaInicio, horaFim) {
+  const { time, wind_speed_10m } = dadosVento.hourly;
+  const velocidades = [];
+
+  for (let i = 0; i < time.length; i++) {
+    const [data, horaTexto] = time[i].split("T");
+    if (data !== dataAlvo) continue;
+
+    const hora = Number(horaTexto.slice(0, 2));
+    if (hora >= horaInicio && hora <= horaFim && wind_speed_10m[i] !== null) {
+      velocidades.push(wind_speed_10m[i]);
+    }
+  }
+
+  if (velocidades.length === 0) return null;
+  return velocidades.reduce((soma, v) => soma + v, 0) / velocidades.length;
+}
+
+function classificarPesca(mediaVelocidade) {
+  if (mediaVelocidade === null) {
+    return { classe: "indisponivel", icone: "❓", texto: "Sem dados suficientes" };
+  }
+  if (mediaVelocidade < 6) {
+    return { classe: "boa", icone: "🎣", texto: "Pescável, quase sem vento" };
+  }
+  if (mediaVelocidade <= 12) {
+    return { classe: "media", icone: "🎣", texto: "Pescável, com pouco vento" };
+  }
+  return { classe: "ruim", icone: "🚫", texto: "Não pescável" };
+}
+
+function calcularPeriodoPesca(dadosVento, horaInicio, horaFim) {
+  const dataAlvo = dataDoPeriodo(horaFim);
+  const media = ventoMedioNoPeriodo(dadosVento, dataAlvo, horaInicio, horaFim);
+
+  return { data: dataAlvo, media, ...classificarPesca(media) };
+}
+
+function htmlCardPesca(rotulo, periodo) {
+  const ventoHtml = periodo.media !== null
+    ? `<div class="vento-medio">Vento médio: ${Math.round(periodo.media)} km/h</div>`
+    : "";
+
+  return `
+    <div class="pesca-card ${periodo.classe}">
+      <div class="periodo">${rotulo}</div>
+      <div class="data">${formatarDia(`${periodo.data}T00:00`)}</div>
+      <div class="icone">${periodo.icone}</div>
+      <div class="status">${periodo.texto}</div>
+      ${ventoHtml}
+    </div>
+  `;
+}
+
+function htmlPescabilidade(periodoManha, periodoTarde) {
+  return `
+    <div class="pesca-titulo">🎣 Pescabilidade (vento médio no período)</div>
+    <div class="pesca">
+      ${htmlCardPesca("Manhã · 6h–12h", periodoManha)}
+      ${htmlCardPesca("Tarde · 13h–18h", periodoTarde)}
+    </div>
+  `;
+}
+
 function htmlHoras(linhas, ehMar, selecionado) {
   const cartoes = linhas.map((linha, indice) => {
     const seta = `<span class="seta" style="transform: rotate(${linha.direcao + 180}deg)">↑</span>`;
@@ -411,6 +567,7 @@ function renderizarLugar(indiceLugar) {
     <h2>${lugar.nome}</h2>
     ${htmlAgora(linhaSelecionada, estado.ehMar)}
     ${htmlHoras(estado.linhas, estado.ehMar, estado.selecionado)}
+    ${htmlPescabilidade(estado.periodoManha, estado.periodoTarde)}
     <div class="atualizado">Atualizado às ${estado.atualizadoEm}</div>
   `;
 
@@ -462,6 +619,8 @@ async function carregarLugar(indiceLugar) {
       linhas,
       ehMar,
       selecionado: 0,
+      periodoManha: calcularPeriodoPesca(dadosVento, 6, 12),
+      periodoTarde: calcularPeriodoPesca(dadosVento, 13, 18),
       atualizadoEm: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     };
 
