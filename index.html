@@ -468,6 +468,10 @@ const DIAS_PREVISAO = 7; // hoje + 6 dias
 // do dia, de 3 em 3 horas.
 const HORAS_DE_PESCA = [6, 9, 12, 15, 18];
 
+// Em pontos no mar, onda média acima disso inviabiliza a pesca,
+// independente do vento.
+const LIMITE_ONDA_PESCA_M = 0.6;
+
 // 7 dias (hoje + 6) x 5 horários por dia
 const HORAS_EXIBIDAS = DIAS_PREVISAO * HORAS_DE_PESCA.length;
 const ATUALIZA_A_CADA_MS = 15 * 60 * 1000; // 15 min
@@ -682,7 +686,12 @@ function resumoPeriodo(dadosVento, dataAlvo, horaInicio, horaFim) {
   };
 }
 
-function classificarPesca(mediaVelocidade) {
+function classificarPesca(mediaVelocidade, ondaMedia) {
+  // No mar, onda grande inviabiliza a pesca mesmo com pouco vento.
+  if (ondaMedia !== null && ondaMedia !== undefined && ondaMedia > LIMITE_ONDA_PESCA_M) {
+    return { classe: "ruim", icone: "🚫", texto: "Não pescável, mar agitado" };
+  }
+
   if (mediaVelocidade === null) {
     return { classe: "indisponivel", icone: "❓", texto: "Sem dados suficientes" };
   }
@@ -719,14 +728,15 @@ function ondaMediaNoPeriodo(dadosOndas, dataAlvo, horaInicio, horaFim) {
 
 function calcularPeriodoPesca(dadosVento, dadosOndas, dataAlvo, horaInicio, horaFim) {
   const resumo = resumoPeriodo(dadosVento, dataAlvo, horaInicio, horaFim);
+  const ondaMedia = ondaMediaNoPeriodo(dadosOndas, dataAlvo, horaInicio, horaFim);
 
   return {
     data: dataAlvo,
     media: resumo.ventoMedio,
     temperaturaMedia: resumo.temperaturaMedia,
     clima: resumo.clima,
-    ondaMedia: ondaMediaNoPeriodo(dadosOndas, dataAlvo, horaInicio, horaFim),
-    ...classificarPesca(resumo.ventoMedio),
+    ondaMedia,
+    ...classificarPesca(resumo.ventoMedio, ondaMedia),
   };
 }
 
