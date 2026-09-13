@@ -400,6 +400,10 @@
     background: linear-gradient(150deg, #a8710f, #f2b705);
   }
 
+  .pesca-card.forte {
+    background: linear-gradient(150deg, #b3450c, #f2790a);
+  }
+
   .pesca-card.ruim {
     background: linear-gradient(150deg, #7c1414, #e74c3c);
   }
@@ -705,11 +709,14 @@ function classificarPesca(mediaVelocidade, ondaMedia) {
   if (mediaVelocidade === null) {
     return { classe: "indisponivel", icone: "❓", texto: "Sem dados suficientes" };
   }
-  if (mediaVelocidade < 6) {
-    return { classe: "boa", icone: "🎣", texto: "Pescável, quase sem vento" };
+  if (mediaVelocidade <= 6) {
+    return { classe: "boa", icone: "🎣", texto: "Pescável, vento fraco" };
+  }
+  if (mediaVelocidade <= 9) {
+    return { classe: "media", icone: "🎣", texto: "Pescável, vento médio" };
   }
   if (mediaVelocidade <= 12) {
-    return { classe: "media", icone: "🎣", texto: "Pescável, com pouco vento" };
+    return { classe: "forte", icone: "🎣", texto: "Pescável, muito vento" };
   }
   return { classe: "ruim", icone: "🚫", texto: "Não pescável" };
 }
