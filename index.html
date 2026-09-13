@@ -192,14 +192,40 @@ const LUGARES = [
 const HORAS_EXIBIDAS = 24;
 const ATUALIZA_A_CADA_MS = 15 * 60 * 1000; // 15 min
 
-const CARDINAIS = [
-  "N", "NNE", "NE", "ENE", "L", "ESE", "SE", "SSE",
-  "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"
-];
+// Códigos de tempo (WMO) usados pela Open-Meteo — https://open-meteo.com/en/docs
+const CLIMA = {
+  0: { icone: "☀️", texto: "Céu limpo" },
+  1: { icone: "🌤️", texto: "Poucas nuvens" },
+  2: { icone: "⛅", texto: "Parcialmente nublado" },
+  3: { icone: "☁️", texto: "Nublado" },
+  45: { icone: "🌫️", texto: "Neblina" },
+  48: { icone: "🌫️", texto: "Neblina" },
+  51: { icone: "🌦️", texto: "Garoa fraca" },
+  53: { icone: "🌦️", texto: "Garoa" },
+  55: { icone: "🌦️", texto: "Garoa forte" },
+  56: { icone: "🌧️", texto: "Garoa congelante" },
+  57: { icone: "🌧️", texto: "Garoa congelante" },
+  61: { icone: "🌧️", texto: "Chuva fraca" },
+  63: { icone: "🌧️", texto: "Chuva" },
+  65: { icone: "🌧️", texto: "Chuva forte" },
+  66: { icone: "🌧️", texto: "Chuva congelante" },
+  67: { icone: "🌧️", texto: "Chuva congelante" },
+  71: { icone: "🌨️", texto: "Neve fraca" },
+  73: { icone: "🌨️", texto: "Neve" },
+  75: { icone: "🌨️", texto: "Neve forte" },
+  77: { icone: "🌨️", texto: "Grãos de neve" },
+  80: { icone: "🌦️", texto: "Pancadas de chuva" },
+  81: { icone: "🌦️", texto: "Pancadas de chuva" },
+  82: { icone: "🌧️", texto: "Pancadas fortes" },
+  85: { icone: "🌨️", texto: "Pancadas de neve" },
+  86: { icone: "🌨️", texto: "Pancadas de neve" },
+  95: { icone: "⛈️", texto: "Trovoada" },
+  96: { icone: "⛈️", texto: "Trovoada com granizo" },
+  99: { icone: "⛈️", texto: "Trovoada com granizo" },
+};
 
-function grausParaCardinal(graus) {
-  const indice = Math.round(graus / 22.5) % 16;
-  return CARDINAIS[indice];
+function infoClima(codigo) {
+  return CLIMA[codigo] || { icone: "🌡️", texto: "—" };
 }
 
 function formatarHora(isoLocal) {
@@ -226,7 +252,7 @@ async function buscarVento(lat, lon) {
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
-    `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+    `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weather_code` +
     `&wind_speed_unit=kmh&timezone=auto&forecast_days=2`;
 
   return buscarJSON(url);
@@ -265,6 +291,8 @@ function montarLinhasHorarias(dadosVento, dadosOndas) {
       velocidade: dadosVento.hourly.wind_speed_10m[i],
       direcao: dadosVento.hourly.wind_direction_10m[i],
       rajada: dadosVento.hourly.wind_gusts_10m[i],
+      temperatura: dadosVento.hourly.temperature_2m[i],
+      codigoClima: dadosVento.hourly.weather_code[i],
       ondaAltura: dadosOndas ? dadosOndas.hourly.wave_height[i] : null,
       ondaDirecao: dadosOndas ? dadosOndas.hourly.wave_direction[i] : null,
       ondaPeriodo: dadosOndas ? dadosOndas.hourly.wave_period[i] : null,
@@ -275,6 +303,7 @@ function montarLinhasHorarias(dadosVento, dadosOndas) {
 
 function htmlAgora(linha, ehMar) {
   const setaVento = `<span class="seta" style="transform: rotate(${linha.direcao + 180}deg)">↑</span>`;
+  const clima = infoClima(linha.codigoClima);
 
   let blocos = `
     <div class="bloco">
@@ -282,8 +311,8 @@ function htmlAgora(linha, ehMar) {
       <div class="valor">${setaVento} ${Math.round(linha.velocidade)} km/h</div>
     </div>
     <div class="bloco">
-      <div class="rotulo">Direção</div>
-      <div class="valor">${grausParaCardinal(linha.direcao)}</div>
+      <div class="rotulo">${clima.texto}</div>
+      <div class="valor">${clima.icone} ${Math.round(linha.temperatura)}°C</div>
     </div>
     <div class="bloco">
       <div class="rotulo">Rajadas</div>

@@ -1,8 +1,9 @@
 # Tempo Caiaque 🌬️🛶
 
 App simples e estático que mostra, hora a hora, o vento (velocidade,
-direção e rajadas) e — quando o ponto é no mar/costa — a altura, direção
-e período das ondas, para uma lista de coordenadas.
+direção via seta e rajadas), a condição do tempo (ícone + temperatura)
+e — quando o ponto é no mar/costa — a altura, direção e período das
+ondas, para uma lista de coordenadas.
 
 Sem build, sem backend: é um único `index.html` que consulta a API
 gratuita da [Open-Meteo](https://open-meteo.com/) direto do navegador.
@@ -25,8 +26,9 @@ simplesmente não mostram ondas.
 
 ## Como funciona
 
-- **Vento**: `api.open-meteo.com/v1/forecast` — velocidade (km/h),
-  direção (graus e ponto cardeal) e rajadas, hora a hora.
+- **Vento e tempo**: `api.open-meteo.com/v1/forecast` — velocidade
+  (km/h) e direção (seta) do vento, rajadas, temperatura e condição do
+  tempo (ícone), hora a hora.
 - **Ondas**: `marine-api.open-meteo.com/v1/marine` — altura (m),
   direção e período, hora a hora, só quando disponível para o ponto.
 - A página recarrega os dados automaticamente a cada 15 minutos.
