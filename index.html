@@ -390,14 +390,14 @@ const LUGARES = [
 
 const DIAS_PREVISAO = 7; // hoje + 6 dias
 
-// 7 dias (hoje + 6) x 13 horas úteis de pesca por dia (6h-18h)
-const HORAS_EXIBIDAS = DIAS_PREVISAO * 13;
-const ATUALIZA_A_CADA_MS = 15 * 60 * 1000; // 15 min
+// Pescador de caiaque não pesca de noite, e mostrar hora a hora dava
+// cards demais pra rolar — a faixa de horários mostra só esses horários
+// do dia, de 3 em 3 horas.
+const HORAS_DE_PESCA = [6, 9, 12, 15, 18];
 
-// Pescador de caiaque não pesca de noite — a faixa de horários só
-// mostra das 6h às 18h, pulando direto pro próximo dia às 19h.
-const HORA_INICIO_PESCA = 6;
-const HORA_FIM_PESCA = 18;
+// 7 dias (hoje + 6) x 5 horários por dia
+const HORAS_EXIBIDAS = DIAS_PREVISAO * HORAS_DE_PESCA.length;
+const ATUALIZA_A_CADA_MS = 15 * 60 * 1000; // 15 min
 
 // Códigos de tempo (WMO) usados pela Open-Meteo — https://open-meteo.com/en/docs
 const CLIMA = {
@@ -500,7 +500,7 @@ function temDadosDeOnda(dadosOndas) {
 
 function dentroDoHorarioDePesca(isoLocal) {
   const hora = Number(isoLocal.slice(11, 13));
-  return hora >= HORA_INICIO_PESCA && hora <= HORA_FIM_PESCA;
+  return HORAS_DE_PESCA.includes(hora);
 }
 
 function montarLinhasHorarias(dadosVento, dadosOndas) {

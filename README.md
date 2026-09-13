@@ -37,8 +37,9 @@ quando os dados já foram carregados.
 - **Ondas**: `marine-api.open-meteo.com/v1/marine` — altura (m),
   direção e período, hora a hora, só quando disponível para o ponto.
 - A página recarrega os dados automaticamente a cada 15 minutos.
-- A previsão cobre hoje + 6 dias (7 dias no total), só das 6h às 18h
-  (fora desse horário o caiaque não sai pra pescar).
+- A previsão cobre hoje + 6 dias (7 dias no total), só nos horários
+  6h, 9h, 12h, 15h e 18h de cada dia (fora disso o caiaque não sai pra
+  pescar, e hora a hora tinha cards demais pra rolar).
 - Cada card de hora mostra dia (Hoje / dd-mm), hora, ícone do tempo,
   temperatura, vento e rajada. Clicar num card atualiza o bloco maior
   de cima com os dados daquela hora (sem precisar buscar de novo na API).
