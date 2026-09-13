@@ -416,9 +416,28 @@ function renderizarLugar(indiceLugar) {
 
   elemento.querySelectorAll(".hora").forEach(cartaoHora => {
     cartaoHora.addEventListener("click", () => {
-      estado.selecionado = Number(cartaoHora.dataset.indice);
-      renderizarLugar(indiceLugar);
+      selecionarHora(indiceLugar, Number(cartaoHora.dataset.indice));
     });
+  });
+}
+
+// Troca só a hora selecionada: atualiza o bloco "agora" e a marcação do
+// card escolhido, sem redesenhar a faixa de horas — assim a rolagem
+// horizontal que o usuário já tinha feito não é perdida.
+function selecionarHora(indiceLugar, indiceHora) {
+  const estado = ESTADO[indiceLugar];
+  const elemento = document.getElementById(`lugar-${indiceLugar}`);
+  if (!estado || !elemento) return;
+
+  estado.selecionado = indiceHora;
+
+  const blocoAgora = elemento.querySelector(".agora");
+  if (blocoAgora) {
+    blocoAgora.outerHTML = htmlAgora(estado.linhas[indiceHora], estado.ehMar);
+  }
+
+  elemento.querySelectorAll(".hora").forEach(cartaoHora => {
+    cartaoHora.classList.toggle("atual", Number(cartaoHora.dataset.indice) === indiceHora);
   });
 }
 
