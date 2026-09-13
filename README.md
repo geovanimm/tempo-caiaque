@@ -35,6 +35,11 @@ simplesmente não mostram ondas.
 - Cada card de hora mostra dia (Hoje / dd-mm), hora, ícone do tempo,
   temperatura, vento e rajada. Clicar num card atualiza o bloco maior
   de cima com os dados daquela hora (sem precisar buscar de novo na API).
+- Dois cards de **pescabilidade** (manhã 6h-12h e tarde 13h-18h)
+  classificam a janela pelo vento médio: abaixo de 6 km/h ("quase sem
+  vento"), 6-12 km/h ("com pouco vento"), acima de 12 km/h ("não
+  pescável"). Cada card passa a mostrar a mesma janela do dia seguinte
+  assim que a janela do dia atual termina.
 
 ## Publicar (GitHub Pages)
 
