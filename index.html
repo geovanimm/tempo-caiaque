@@ -531,17 +531,23 @@ function formatarHora(isoLocal) {
   return isoLocal.slice(11, 16);
 }
 
+const DIAS_SEMANA_ABREV = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"];
+
 function formatarDia(isoLocal) {
   const dataLinha = isoLocal.slice(0, 10); // "AAAA-MM-DD"
 
-  const hoje = new Date();
   const pad = n => String(n).padStart(2, "0");
-  const dataHoje = `${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}`;
+  const paraChave = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  if (dataLinha === dataHoje) return "Hoje";
+  const hoje = new Date();
+  if (dataLinha === paraChave(hoje)) return "Hoje";
 
-  const [, mes, dia] = dataLinha.split("-");
-  return `${dia}/${mes}`;
+  const amanha = new Date(hoje);
+  amanha.setDate(hoje.getDate() + 1);
+  if (dataLinha === paraChave(amanha)) return "Amanhã";
+
+  const dataObj = new Date(`${dataLinha}T00:00:00`);
+  return DIAS_SEMANA_ABREV[dataObj.getDay()];
 }
 
 function horaAtualISO() {
